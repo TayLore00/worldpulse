@@ -21,6 +21,7 @@ export const COUNTRY_COORDS: Record<string, [number, number]> = {
   eg: [30.8025, 26.8206],
   ua: [31.1656, 48.3794],
   il: [34.8516, 31.0461],
+  ps: [35.2332, 31.9522],
   tr: [35.9249, 38.9637],
   ir: [54.6879, 32.4279],
   pk: [69.3451, 30.3753],
@@ -94,6 +95,136 @@ export const COUNTRY_COORDS: Record<string, [number, number]> = {
   ec: [-78.1834, -1.8312],
 };
 
-export function getCoords(countryCode: string): [number, number] | null {
-  return COUNTRY_COORDS[countryCode.toLowerCase()] ?? null;
+const KEYWORD_MAP: Record<string, string> = {
+  // Sources
+  "bbc": "gb", "guardian": "gb", "reuters": "gb", "sky news": "gb",
+  "cnn": "us", "fox": "us", "nbc": "us", "abc": "us", "cbs": "us",
+  "washington post": "us", "new york times": "us", "npr": "us",
+  "ap": "us", "associated press": "us", "bloomberg": "us",
+  "politico": "us", "axios": "us", "the hill": "us",
+  "al jazeera": "sa", "france 24": "fr", "dw": "de",
+  "rt": "ru", "tass": "ru", "sputnik": "ru",
+  "xinhua": "cn", "cgtn": "cn", "global times": "cn",
+  "times of india": "in", "ndtv": "in", "the hindu": "in",
+  "haaretz": "il", "jerusalem post": "il",
+  "kyiv": "ua",
+  "abc australia": "au", "abc news australia": "au",
+
+  // Palestine — recognized as sovereign nation
+  "palestine": "ps", "palestinian": "ps",
+  "west bank": "ps", "ramallah": "ps",
+  "gaza": "ps", "gaza strip": "ps",
+
+  // Countries in text
+  "united states": "us", "america": "us", "american": "us",
+  "washington": "us", "white house": "us", "pentagon": "us",
+  "congress": "us", "senate": "us",
+  "united kingdom": "gb", "britain": "gb", "british": "gb",
+  "england": "gb", "london": "gb",
+  "france": "fr", "french": "fr", "paris": "fr",
+  "germany": "de", "german": "de", "berlin": "de",
+  "russia": "ru", "russian": "ru", "moscow": "ru", "kremlin": "ru",
+  "china": "cn", "chinese": "cn", "beijing": "cn",
+  "japan": "jp", "japanese": "jp", "tokyo": "jp",
+  "india": "in", "indian": "in", "delhi": "in", "modi": "in",
+  "brazil": "br", "brazilian": "br",
+  "australia": "au", "australian": "au", "canberra": "au",
+  "canada": "ca", "canadian": "ca", "ottawa": "ca",
+  "israel": "il", "israeli": "il", "tel aviv": "il",
+  "iran": "ir", "iranian": "ir", "tehran": "ir",
+  "ukraine": "ua", "ukrainian": "ua",
+  "turkey": "tr", "turkish": "tr", "ankara": "tr",
+  "pakistan": "pk", "pakistani": "pk", "islamabad": "pk",
+  "north korea": "kr", "south korea": "kr", "korean": "kr",
+  "saudi arabia": "sa", "saudi": "sa", "riyadh": "sa",
+  "mexico": "mx", "mexican": "mx",
+  "nigeria": "ng", "nigerian": "ng",
+  "egypt": "eg", "egyptian": "eg", "cairo": "eg",
+  "iraq": "iq", "iraqi": "iq", "baghdad": "iq",
+  "syria": "sy", "syrian": "sy", "damascus": "sy",
+  "afghanistan": "af", "afghan": "af", "kabul": "af",
+  "south africa": "za",
+  "indonesia": "id", "indonesian": "id", "jakarta": "id",
+  "taiwan": "tw", "taipei": "tw",
+  "venezuela": "ve", "venezuelan": "ve",
+  "colombia": "co", "colombian": "co",
+  "argentina": "ar", "argentinian": "ar",
+  "poland": "pl", "polish": "pl", "warsaw": "pl",
+  "sweden": "se", "swedish": "se", "stockholm": "se",
+  "netherlands": "nl", "dutch": "nl", "amsterdam": "nl",
+  "ethiopia": "et", "ethiopian": "et",
+  "kenya": "ke", "kenyan": "ke", "nairobi": "ke",
+  "libya": "ly", "libyan": "ly",
+  "sudan": "sd", "sudanese": "sd",
+  "lebanon": "lb", "lebanese": "lb", "beirut": "lb",
+  "jordan": "jo", "jordanian": "jo", "amman": "jo",
+  "bangladesh": "bd",
+  "vietnam": "vn", "vietnamese": "vn",
+  "thailand": "th", "thai": "th", "bangkok": "th",
+  "philippines": "ph", "filipino": "ph", "manila": "ph",
+  "malaysia": "my", "malaysian": "my", "kuala lumpur": "my",
+  "singapore": "sg",
+  "hong kong": "hk",
+  "new zealand": "nz",
+  "ireland": "ie", "irish": "ie", "dublin": "ie",
+  "spain": "es", "spanish": "es", "madrid": "es",
+  "italy": "it", "italian": "it", "rome": "it",
+  "greece": "gr", "greek": "gr", "athens": "gr",
+  "switzerland": "ch", "swiss": "ch", "geneva": "ch",
+  "belgium": "be", "belgian": "be", "brussels": "be",
+  "portugal": "pt", "portuguese": "pt", "lisbon": "pt",
+  "norway": "no", "norwegian": "no", "oslo": "no",
+  "denmark": "dk", "danish": "dk", "copenhagen": "dk",
+  "finland": "fi", "finnish": "fi", "helsinki": "fi",
+  "romania": "ro", "romanian": "ro", "bucharest": "ro",
+  "hungary": "hu", "hungarian": "hu", "budapest": "hu",
+  "czech": "cz", "prague": "cz",
+  "cuba": "cu", "cuban": "cu", "havana": "cu",
+  "haiti": "ht", "haitian": "ht",
+  "myanmar": "mm", "burma": "mm",
+  "cambodia": "kh",
+  "nepal": "np", "kathmandu": "np",
+  "sri lanka": "lk",
+  "morocco": "ma", "moroccan": "ma", "rabat": "ma",
+  "algeria": "dz", "algerian": "dz",
+  "tunisia": "tn", "tunisian": "tn",
+  "ghana": "gh", "ghanaian": "gh",
+  "tanzania": "tz",
+  "chile": "cl", "chilean": "cl", "santiago": "cl",
+  "peru": "pe", "peruvian": "pe", "lima": "pe",
+  "ecuador": "ec",
+  "bolivia": "bo",
+  "paraguay": "py",
+  "uruguay": "uy",
+  "panama": "pa",
+  "costa rica": "cr",
+  "guatemala": "gt",
+  "honduras": "hn",
+  "el salvador": "sv",
+};
+
+export function getCoords(text: string): [number, number] | null {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  for (const [keyword, code] of Object.entries(KEYWORD_MAP)) {
+    if (lower.includes(keyword)) {
+      return COUNTRY_COORDS[code] ?? null;
+    }
+  }
+  if (COUNTRY_COORDS[lower]) return COUNTRY_COORDS[lower];
+  return null;
+}
+
+export function extractGeoText(article: {
+  headline?: string;
+  summary?: string;
+  country?: string;
+  source?: string;
+}): string {
+  return [
+    article.headline || "",
+    article.summary || "",
+    article.country || "",
+    article.source || "",
+  ].join(" ");
 }

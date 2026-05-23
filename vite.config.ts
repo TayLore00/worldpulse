@@ -10,6 +10,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/newsapi/, ""),
       },
+      "/gdelt": {
+        target: "https://api.gdeltproject.org",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/gdelt/, ""),
+      },
     },
   },
 });
