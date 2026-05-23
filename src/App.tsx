@@ -10,25 +10,13 @@ import type { NewsArticle, MapMarker, Category } from "./types/news";
 const REFRESH_INTERVAL = 15 * 60 * 1000;
 
 async function fetchFromGDELT(): Promise<NewsArticle[]> {
-  const url = `/gdelt/api/v2/doc/doc?query=world&mode=artlist&maxrecords=250&format=json&sourcelang=english`;
+  const url = `/api/news`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
     if (!data.articles) return [];
-    return data.articles
-      .filter((a: any) => a.title && a.url && a.sourcecountry)
-      .map((a: any, i: number) => ({
-        id: `${i}-${Date.now()}`,
-        headline: a.title,
-        summary: "",
-        url: a.url,
-        source: a.domain || "Unknown",
-        published_at: a.seendate || "",
-        category: classifyArticle(a.title, "", "world"),
-        country: a.sourcecountry || "",
-        image_url: a.socialimage || "",
-      }));
+    return data.articles;
   } catch {
     return [];
   }

@@ -5,15 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/newsapi": {
-        target: "https://newsapi.org",
+      "/api": {
+        target: "http://localhost:3001",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/newsapi/, ""),
-      },
-      "/gdelt": {
-        target: "https://api.gdeltproject.org",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/gdelt/, ""),
       },
     },
   },
