@@ -3,43 +3,31 @@ import Navbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import MapView from "./components/MapView";
 import NewsPanel from "./components/NewsPanel";
-import { supabase } from "./lib/supabase";
 import { getCoords } from "./lib/coordinates";
 import { classifyArticle } from "./lib/categories";
 import type { NewsArticle, MapMarker, Category } from "./types/news";
 
 const REFRESH_INTERVAL = 5 * 60 * 1000;
 
-async function queryCachedNews(category?: string): Promise<NewsArticle[]> {
-  let query = supabase
-    .from("news_cache")
-    .select("*")
-    .order("published_at", { ascending: false });
-
-  if (category && category !== "all") {
-    query = query.eq("category", category);
-  }
-
-  const { data, error } = await query.limit(200);
-  if (error) {
-    console.error("Supabase query error:", error);
-    return [];
-  }
-  return (data as NewsArticle[]) || [];
-}
-
-async function triggerEdgeFunctionFetch(): Promise<void> {
-  const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/news?action=fetch`;
-  const res = await fetch(apiUrl, {
-    headers: {
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("Edge function fetch failed:", res.status, body);
-  }
+async function fetchFromNewsAPI(): Promise<NewsArticle[]> {
+  const apiKey = import.meta.env.VITE_NEWS_API_KEY;
+  const url = `/newsapi/v2/top-headlines?language=en&pageSize=100&apiKey=${apiKey}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!data.articles) return [];
+  return data.articles
+    .filter((a: any) => a.title && a.url)
+    .map((a: any, i: number) => ({
+      id: String(i),
+      headline: a.title,
+      summary: a.description || "",
+      url: a.url,
+      source: a.source?.name || "Unknown",
+      published_at: a.publishedAt,
+      category: a.category || "world",
+      country: a.source?.name || "World",
+      image_url: a.urlToImage || "",
+    }));
 }
 
 export default function App() {
@@ -55,22 +43,9 @@ export default function App() {
 
   const fetchNews = useCallback(async () => {
     try {
-      // Step 1: Try reading from cache
-      let cached = await queryCachedNews();
-
-      // Step 2: If cache is empty, trigger edge function to populate it
-      if (cached.length === 0) {
-        try {
-          await triggerEdgeFunctionFetch();
-        } catch {
-          console.error("Edge function trigger failed");
-        }
-        // Re-query after edge function populates data
-        cached = await queryCachedNews();
-      }
-
-      if (cached.length > 0) {
-        setArticles(cached);
+      const articles = await fetchFromNewsAPI();
+      if (articles.length > 0) {
+        setArticles(articles);
         setLastUpdated(new Date());
       }
     } catch (err) {
@@ -80,17 +55,15 @@ export default function App() {
     }
   }, []);
 
-  // Background refresh: re-trigger edge function + re-query cache
   const refreshNews = useCallback(async () => {
     try {
-      await triggerEdgeFunctionFetch();
+      const articles = await fetchFromNewsAPI();
+      if (articles.length > 0) {
+        setArticles(articles);
+        setLastUpdated(new Date());
+      }
     } catch {
       // non-fatal
-    }
-    const cached = await queryCachedNews();
-    if (cached.length > 0) {
-      setArticles(cached);
-      setLastUpdated(new Date());
     }
   }, []);
 
@@ -100,7 +73,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [fetchNews, refreshNews]);
 
-  // Filter articles and build markers
   useEffect(() => {
     const filtered =
       activeCategory === "all"
